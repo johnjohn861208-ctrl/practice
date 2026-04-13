@@ -1,0 +1,78 @@
+請幫我建立一個名為 medtrack-pro 的醫藥業務管理 Web App，使用以下技術：
+
+技術架構：
+- 前端：React + Vite + React Router
+- 後端：Node.js + Express
+- 資料庫：SQLite（使用 better-sqlite3）
+- 樣式：純 CSS（不用 Tailwind）
+
+專案結構：
+medtrack-pro/
+  backend/
+    server.js          # Express 主程式
+    database.js        # SQLite 初始化與 seed 資料
+    routes/
+      performance.js   # 業績 API
+      activities.js    # 活動 API
+      contacts.js      # 客戶 CRM API
+  frontend/
+    src/
+      App.jsx
+      main.jsx
+      pages/
+        Dashboard.jsx
+        Performance.jsx
+        Activities.jsx
+        CRM.jsx
+      components/
+        Sidebar.jsx
+        MetricCard.jsx
+      styles/
+        global.css
+    index.html
+    vite.config.js
+  package.json（根目錄，用來同時啟動前後端）
+
+資料庫 Schema：
+
+1. contacts 表（客戶）
+   - id, name, title, hospital, department, grade(A/B/C), potential(高/中/低), phone, email, last_visit, next_follow_up, created_at
+
+2. contact_logs 表（聯絡紀錄）
+   - id, contact_id, type(拜訪/電話/Email), content, log_date, created_at
+
+3. performance 表（業績紀錄）
+   - id, hospital, doctor, product_line, amount, target, month, created_at
+
+4. activities 表（活動）
+   - id, title, location, date, expected_attendees, status(計畫中/進行中/已完成), created_at
+
+5. activity_tasks 表（活動子任務）
+   - id, activity_id, title, is_done, due_date, created_at
+
+API 路由：
+GET/POST /api/contacts
+GET/PUT/DELETE /api/contacts/:id
+POST /api/contacts/:id/logs
+GET /api/contacts/:id/logs
+
+GET/POST /api/performance
+GET /api/performance/summary
+
+GET/POST /api/activities
+PUT /api/activities/:id
+GET /api/activities/:id/tasks
+POST /api/activities/:id/tasks
+PUT /api/activities/:id/tasks/:taskId
+
+GET /api/dashboard/summary
+
+前端設計風格：
+- 乾淨白底，左側 sidebar 導航
+- 配色：主色 #378ADD（藍）、成功 #1D9E75（綠）、警告 #EF9F27（橙）、危險 #D85A30（紅）
+- 字體：system-ui
+- 四個頁面：總覽、業績管理、活動進度、客戶管理
+
+請幫我建立所有檔案，並在 database.js 加入範例資料（3-5 筆 contacts、2-3 筆 activities、5-6 筆 performance），讓我啟動後就能看到資料。
+
+最後告訴我如何啟動這個專案。
