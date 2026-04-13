@@ -1,78 +1,90 @@
-請幫我建立一個名為 medtrack-pro 的醫藥業務管理 Web App，使用以下技術：
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>業務活動追蹤管理 - 雲端版</title>
+    <style>
+        :root { --notion-bg: #ffffff; --notion-text: #37352f; --notion-border: #edeef0; --notion-gray: #787774; --notion-blue: #2383e2; --notion-hover: #f1f1f1; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--notion-bg); color: var(--notion-text); margin: 0; padding: 20px 10px; display: flex; justify-content: center; }
+        .container { max-width: 800px; width: 100%; }
+        h1 { font-size: 28px; margin-bottom: 20px; text-align: center; }
+        input, select, button { padding: 12px 14px; border: 1px solid var(--notion-border); border-radius: 8px; outline: none; font-size: 16px; box-sizing: border-box; }
+        button { background-color: var(--notion-blue); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .input-section { display: flex; gap: 10px; margin-bottom: 20px; padding: 15px; background: #f7f6f3; border-radius: 12px; flex-direction: column; }
+        @media (min-width: 768px) { .input-section { flex-direction: row; align-items: center; } .input-section input[type="text"] { flex-grow: 1; } }
+        .event-card { border: 1px solid var(--notion-border); border-radius: 12px; padding: 15px; margin-bottom: 20px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .event-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--notion-border); padding-bottom: 12px; margin-bottom: 12px; }
+        .task-item { display: flex; align-items: center; gap: 8px; margin: 12px 0; padding: 8px 4px; border-radius: 8px; }
+        input[type="checkbox"] { width: 20px; height: 20px; }
+        .task-input { border: 1px solid transparent; background: transparent; font-size: 16px; flex-grow: 1; color: var(--notion-text); }
+        .date-input { color: var(--notion-gray); border: 1px solid var(--notion-border); background: #f9f9f9; width: auto; font-size: 14px; }
+        .delete-btn { background: #ffeeee; color: #e03e3e; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>☁️ 業務活動追蹤管理</h1>
+    <div class="input-section">
+        <select id="eventType"><option value="RTD">RTD</option><option value="Seminar">Seminar</option><option value="HL">HL</option></select>
+        <input type="text" id="eventName" placeholder="活動/院所名稱">
+        <input type="date" id="eventDate">
+        <button id="addEventBtn">新增計畫</button>
+    </div>
+    <div id="loading" style="text-align:center;">連線中...</div>
+    <div id="eventList"></div>
+</div>
 
-技術架構：
-- 前端：React + Vite + React Router
-- 後端：Node.js + Express
-- 資料庫：SQLite（使用 better-sqlite3）
-- 樣式：純 CSS（不用 Tailwind）
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-專案結構：
-medtrack-pro/
-  backend/
-    server.js          # Express 主程式
-    database.js        # SQLite 初始化與 seed 資料
-    routes/
-      performance.js   # 業績 API
-      activities.js    # 活動 API
-      contacts.js      # 客戶 CRM API
-  frontend/
-    src/
-      App.jsx
-      main.jsx
-      pages/
-        Dashboard.jsx
-        Performance.jsx
-        Activities.jsx
-        CRM.jsx
-      components/
-        Sidebar.jsx
-        MetricCard.jsx
-      styles/
-        global.css
-    index.html
-    vite.config.js
-  package.json（根目錄，用來同時啟動前後端）
+    // 🔴 這裡請貼上你自己的 Firebase Config 內容！
+    const firebaseConfig = {
+      apiKey: "貼在這裡",
+      authDomain: "貼在這裡",
+      projectId: "貼在這裡",
+      storageBucket: "貼在這裡",
+      messagingSenderId: "貼在這裡",
+      appId: "貼在這裡"
+    };
 
-資料庫 Schema：
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const eventsCollection = collection(db, "business_events");
 
-1. contacts 表（客戶）
-   - id, name, title, hospital, department, grade(A/B/C), potential(高/中/低), phone, email, last_visit, next_follow_up, created_at
+    const templates = {
+        "RTD": [{ task: "確認主講醫師", daysBefore: 21 }, { task: "訂餐", daysBefore: 3 }],
+        "Seminar": [{ task: "規劃預算", daysBefore: 30 }, { task: "講師邀約", daysBefore: 21 }],
+        "HL": [{ task: "確認門診時間", daysBefore: 7 }, { task: "準備 Sample", daysBefore: 3 }]
+    };
 
-2. contact_logs 表（聯絡紀錄）
-   - id, contact_id, type(拜訪/電話/Email), content, log_date, created_at
+    onSnapshot(query(eventsCollection, orderBy("createdAt", "desc")), (snapshot) => {
+        const events = [];
+        snapshot.forEach((doc) => events.push({ id: doc.id, ...doc.data() }));
+        document.getElementById('loading').style.display = 'none';
+        const list = document.getElementById('eventList');
+        list.innerHTML = events.map(event => `
+            <div class="event-card">
+                <div class="event-header"><strong>${event.type} - ${event.name}</strong><button class="delete-btn" onclick="deleteEvent('${event.id}')">刪除</button></div>
+                ${event.tasks.map(t => `<div class="task-item"><input type="checkbox" ${t.completed ? 'checked' : ''}><span>${t.title}</span> <span style="font-size:12px; color:gray;">(${t.deadline})</span></div>`).join('')}
+            </div>
+        `).join('');
+    });
 
-3. performance 表（業績紀錄）
-   - id, hospital, doctor, product_line, amount, target, month, created_at
+    window.deleteEvent = async (id) => { if(confirm("刪除？")) await deleteDoc(doc(db, "business_events", id)); };
 
-4. activities 表（活動）
-   - id, title, location, date, expected_attendees, status(計畫中/進行中/已完成), created_at
-
-5. activity_tasks 表（活動子任務）
-   - id, activity_id, title, is_done, due_date, created_at
-
-API 路由：
-GET/POST /api/contacts
-GET/PUT/DELETE /api/contacts/:id
-POST /api/contacts/:id/logs
-GET /api/contacts/:id/logs
-
-GET/POST /api/performance
-GET /api/performance/summary
-
-GET/POST /api/activities
-PUT /api/activities/:id
-GET /api/activities/:id/tasks
-POST /api/activities/:id/tasks
-PUT /api/activities/:id/tasks/:taskId
-
-GET /api/dashboard/summary
-
-前端設計風格：
-- 乾淨白底，左側 sidebar 導航
-- 配色：主色 #378ADD（藍）、成功 #1D9E75（綠）、警告 #EF9F27（橙）、危險 #D85A30（紅）
-- 字體：system-ui
-- 四個頁面：總覽、業績管理、活動進度、客戶管理
-
-請幫我建立所有檔案，並在 database.js 加入範例資料（3-5 筆 contacts、2-3 筆 activities、5-6 筆 performance），讓我啟動後就能看到資料。
-
-最後告訴我如何啟動這個專案。
+    document.getElementById('addEventBtn').onclick = async () => {
+        const name = document.getElementById('eventName').value;
+        const date = document.getElementById('eventDate').value;
+        const type = document.getElementById('eventType').value;
+        if(!name || !date) return alert("必填");
+        const tasks = (templates[type] || []).map(t => {
+            const d = new Date(date); d.setDate(d.getDate() - t.daysBefore);
+            return { title: t.task, deadline: d.toISOString().split('T')[0], completed: false };
+        });
+        await addDoc(eventsCollection, { type, name, targetDate: date, tasks, createdAt: Date.now() });
+    };
+</script>
+</body>
+</html>
